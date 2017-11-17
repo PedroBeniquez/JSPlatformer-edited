@@ -2,8 +2,8 @@
 var actorChars = {
   "@": Player,
   "o": Coin, // A coin will wobble up and down
-  "=": Lava, "|": Lava, "v": Lava,  
-  "P": Portal,
+  "=": Lava, "|": Lava, "v": Lava,
+  "C": Cloud,
 };
 
 function Level(plan) {
@@ -92,13 +92,6 @@ function Coin(pos) {
 }
 Coin.prototype.type = "coin";
 
-function Portal(pos) {
-  this.basePos = this.pos = pos.plus(new Vector(0.2, 0.1));
-  this.size = new Vector(0.6, 0.6);
-  // Make it go back and forth in a sine wave.
-  this.wobble = Math.random() * Math.PI * 2;
-}
-Portal.prototype.type = "portal";
 
 // Lava is initialized based on the character, but otherwise has a
 // size and position
@@ -118,6 +111,16 @@ function Lava(pos, ch) {
   }
 }
 Lava.prototype.type = "lava";
+
+function Cloud(pos) {
+  this.basePos = this.pos = pos.plus(new Vector(0.2, 0.1));
+  this.size = new Vector(0.6, 0.6);
+  // Make it go back and forth in a sine wave.
+  this.wobble = Math.random() * Math.PI * 2;
+}
+Cloud.prototype.type = "cloud";
+
+
 
 // Helper function to easily create an element of a type provided 
 function elt(name, className) {
@@ -294,16 +297,6 @@ Lava.prototype.act = function(step, level) {
     this.speed = this.speed.times(-1);
 };
 
-Portal.prototype.act = function(step, level) {
-  var newPos = this.pos.plus(this.speed.times(step));
-  if (!level.obstacleAt(newPos, this.size))
-    this.pos = newPos;
-  else if (this.repeatPos)
-    this.pos = this.repeatPos;
-  else
-    this.speed = this.speed.times(-1);
-};
-
 
 var maxStep = 0.05;
 
@@ -320,6 +313,26 @@ var maxStep = 0.05;
 var wobbleSpeed = 8, wobbleDist = 0.07;
 
 Coin.prototype.act = function(step) {
+  this.wobble += step * wobbleSpeed;
+  var wobblePos = Math.sin(this.wobble) * wobbleDist;
+  this.pos = this.basePos.plus(new Vector(0, wobblePos));
+};
+
+var maxStep = 0.05;
+
+var wobbleSpeed = 3, wobbleDist = 0.09;
+
+Cloud.prototype.act = function(step) {
+  this.wobble += step * wobbleSpeed;
+  var wobblePos = Math.sin(this.wobble) * wobbleDist;
+  this.pos = this.basePos.plus(new Vector(0, wobblePos));
+};
+
+var maxStep = 0.05;
+
+var wobbleSpeed = 3, wobbleDist = 0.09;
+
+Cloud.prototype.act = function(step) {
   this.wobble += step * wobbleSpeed;
   var wobblePos = Math.sin(this.wobble) * wobbleDist;
   this.pos = this.basePos.plus(new Vector(0, wobblePos));
@@ -360,9 +373,12 @@ Player.prototype.moveY = function(step, level, keys) {
   // jump if they are touching some obstacle.
   if (obstacle) {
     level.playerTouched(obstacle);
-    if (keys.up && this.speed.y > 0)
+    if (obstacle == "portal") {
+      this.pos = this.pos.plus(new Vector (-10, 0));
+    }
+    else if (keys.up && this.speed.y > 0)
       this.speed.y = -jumpSpeed;
-    else
+    else 
       this.speed.y = 0;
   } else {
     this.pos = newPos;
@@ -391,20 +407,24 @@ Level.prototype.playerTouched = function(type, actor) {
   if (type == "lava" && this.status == null) {
     this.status = "lost";
     this.finishDelay = 1;
-  } else if (type == "portal" && this.status == null) {
-    this.status = "lost";
-    this.finishDelay = 1;
-  } else if (type == "coin") {
-    this.actors = this.actors.filter(function(other) {
-      return other != actor;
-    });
+    jumpSpeed = 17;
+  }
+  
+  else if (type == "coin") {
+    this.actors = this.actors.filter(function(other)
+    {return other != actor;})
+  
     // If there aren't any coins left, player wins
-    if (!this.actors.some(function(actor) {
-           return actor.type == "coin";
-         })) {
+    if (!this.actors.some(function(actor){return actor.type == "coin";})) {
       this.status = "won";
       this.finishDelay = 1;
     }
+  }
+  
+  else if (type == "cloud") {
+    jumpSpeed = 30;
+    this.actors = this.actors.filter(function(other)
+    {return other != actor;});
   }
 };
 
